@@ -1,10 +1,12 @@
 // controllers/predictController.js
 const { getModelInfo, predict } = require("../services/tfModelService");
 
+const Prediccion = require("../models/prediction");
+
 function health(req, res) {
   res.json({
     status: "ok",
-    service: "predict"
+    service: "predict",
   });
 }
 
@@ -15,13 +17,13 @@ function ready(req, res) {
     return res.status(503).json({
       ready: false,
       modelVersion: info.modelVersion,
-      message: "Model is still loading"
+      message: "Model is still loading",
     });
   }
 
   res.json({
     ready: true,
-    modelVersion: info.modelVersion
+    modelVersion: info.modelVersion,
   });
 }
 
@@ -33,11 +35,12 @@ async function doPredict(req, res) {
     if (!info.ready) {
       return res.status(503).json({
         error: "Model not ready",
-        ready: false
+        ready: false,
       });
     }
 
-    const { features, meta } = req.body;
+    const { features, meta, targetDate, dailyValues, kunnaMeta, fetchMeta } =
+      req.body;
 
     if (!features) {
       return res.status(400).json({ error: "Missing features" });
@@ -50,13 +53,13 @@ async function doPredict(req, res) {
 
     if (featureCount !== info.inputDim) {
       return res.status(400).json({
-        error: `featureCount must be ${info.inputDim}, received ${featureCount}`
+        error: `featureCount must be ${info.inputDim}, received ${featureCount}`,
       });
     }
 
     if (!Array.isArray(features) || features.length !== info.inputDim) {
       return res.status(400).json({
-        error: `features must be an array of ${info.inputDim} numbers`
+        error: `features must be an array of ${info.inputDim} numbers`,
       });
     }
 
@@ -64,12 +67,26 @@ async function doPredict(req, res) {
     const latencyMs = Date.now() - start;
     const timestamp = new Date().toISOString();
 
-    // De momento sin MongoDB → predictionId null
-    res.status(201).json({
-      predictionId: null,
+    const documento_prediccion = await Prediccion.create({
+      features,
       prediction,
       timestamp,
-      latencyMs
+      latencyMs,
+      meta,
+      targetDate,
+      dailyValues,
+      kunnaMeta,
+      fetchMeta,
+    });
+
+    // De momento sin MongoDB → predictionId null
+    res.status(201).json({
+      predictionId: documento_prediccion._id,
+      prediction: prediction,
+      create_dt: timestamp,
+      features: features,
+      dataId: meta.dataId,
+      latencia: latencyMs,
     });
   } catch (err) {
     console.error("Error en /predict:", err);
@@ -80,5 +97,5 @@ async function doPredict(req, res) {
 module.exports = {
   health,
   ready,
-  doPredict
+  doPredict,
 };

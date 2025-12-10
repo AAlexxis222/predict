@@ -1,14 +1,27 @@
 // server.js
 // Entry point del servicio PREDICT
 
+require("dotenv").config();
 const express = require("express");
 const path = require("path");
+const mongoose = require("mongoose");
+const p = require("./models/prediction");
 const predictRoutes = require("./routes/predictRoutes");
 const { initModel } = require("./services/tfModelService");
+const app = express();
 
 const PORT = process.env.PORT || 3002;
+const MODEL_VERSION = process.env.MODEL_VERSION || "v1.0";
 
-const app = express();
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log("Conexión a la base de datos establecida");
+  })
+  .catch((err) => {
+    console.error("Error de conexión a la base de datos:", err);
+  });
+
 app.use(express.json());
 
 // Servir la carpeta del modelo TFJS (model/model.json + pesos)
